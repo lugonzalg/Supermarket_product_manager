@@ -1,3 +1,5 @@
+x-project-name: scraper
+
 services:
 
   scraper:
@@ -8,10 +10,12 @@ services:
 
     volumes:
       - scraper_src:/src
+      - scraper_conf:/tmp/conf
       - scraper_log:/log/scraper
 
     environment:
       - PATH_LOG
+      - PARAMS
 
     depends_on:
       - postgres
@@ -59,6 +63,13 @@ volumes:
       type: none
       o: bind
       device: ./requirements/scraper/src
+
+  scraper_conf:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./requirements/scraper/conf
 
   scraper_log:
     driver: local

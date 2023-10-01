@@ -1,30 +1,62 @@
+from sqlalchemy.orm import Session
 import asyncio
 import aiohttp
-from bs4 import BeautifulSoup
-import pandas as pd
+from Logger import logger
 
-async def query(client: aiohttp.ClientSession) -> None:
-    url = 'https://tienda.mercadona.es/categories/112'
-    response = await client.get(url)
+import params, models, database, crud
 
-    if response.status == 200:
-        print(response.text)
-        text = await response.text()
-        soup = BeautifulSoup(text, 'html.parser')
-        products = soup.find_all('div', class_='product-container')
-        
-        data = []
-        for product in products:
-            name = product.find('span', class_='product-name').text.strip()
-            price = product.find('span', class_='product-price').text.strip()
-            data.append({'Product': name, 'Price': price})
-            
-        df = pd.DataFrame(data)
-        print(df)
+models.Base.metadata.create_all(bind=database.engine)
+
+async def aio_get(
+        client: aiohttp.ClientSession, 
+        url: str, 
+        headers: dict, 
+        params: dict = None
+        ) -> object:
+    
+    try:
+        aio_res = await client.get(url, headers=headers, params=params)
+        return aio_res
+    except aiohttp.HTTPClientError as err:
+        logger.logger.error(f"Error: client side error {err}")
+    except aiohttp.HTTPServerError as err:
+        logger.logger.error(f"Error: server side error {err}")
+    except asyncio.TimeoutError as err:
+        logger.logger.error(f"Error: timeout {err}")
+
+def save_categories(db: Session, categories_info: dict) -> None:
+    results = categories_info.get("results")
+    if results is None or len(results) == 0:
+        return None
+
+    for result in results:
+        categories = result.get("categories")
+        for category in categories:
+            db_category = models.Category(
+                category = category.get("name"),
+                category_id = category.get("id")
+            )
+            crud.add_category(db, db_category)
+
+async def get_categories(client: aiohttp.ClientSession) -> None:
+
+    url = params.URL_CATEGORIES
+    res = await aio_get(client, url, headers=params.BASIC_HEADERS)
+    if res is None:
+        logger.logger.error("Error: categories fetching failed")
+        return None
+
+    db = next(database.get_db())
+    categories_info = await res.json()
+    save_categories(db, categories_info)
+    db.close()
+
 
 async def main() -> None:
-    async with aiohttp.ClientSession() as client:
-        await query(client)
+    timeout = aiohttp.ClientTimeout(total=60)
+    async with aiohttp.ClientSession(timeout=timeout) as client:
+        await get_categories(client)
         
 if __name__ == "__main__":
+
     asyncio.run(main())

@@ -1,3 +1,5 @@
 .env
 log
 data
+params.yml
+__pycache__
