@@ -1,0 +1,82 @@
+services:
+
+  scraper:
+    container_name: scraper
+    build:
+      context: ./requirements/scraper
+      dockerfile: Dockerfile
+
+    volumes:
+      - scraper_src:/src
+      - scraper_log:/log/scraper
+
+    environment:
+      - PATH_LOG
+
+    depends_on:
+      - postgres
+
+    networks:
+      - scraper
+
+    entrypoint: python /src/main.py
+        #restart: always
+
+  postgres:
+    container_name: postgres
+    build:
+      context: ./requirements/postgres
+      dockerfile: Dockerfile
+
+    volumes:
+      - scraper_postgres_data:/var/lib/postgresql/data
+
+    environment:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
+        - POSTGRES_HOST
+        - SCRAPER_USER
+        - SCRAPER_PASS
+        - SCRAPER_DB
+    
+    expose:
+    - 5432
+    networks:
+      - scraper
+
+    restart: always
+
+networks:
+        scraper:
+                name: scraper
+                driver: bridge
+
+volumes:
+  scraper_src:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./requirements/scraper/src
+
+  scraper_log:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./log/scraper
+
+  scraper_postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+
+  scraper_postgres_log:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./log/postgres
